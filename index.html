@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeLens AI - AI-Powered Code Evaluator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+        }
+        
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .glow-effect {
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        }
+        
+        .score-ring {
+            transform: rotate(-90deg);
+        }
+        
+        textarea::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        textarea::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        
+        textarea::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 3px;
+        }
+        
+        .feedback-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .feedback-scroll::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        
+        .feedback-scroll::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 3px;
+        }
+        
+        .line-numbers {
+            background: #1e293b;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-align: right;
+            padding: 0.5rem 0;
+            user-select: none;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .line-numbers > div {
+            height: 1.25rem;
+            line-height: 1.25rem;
+            padding-right: 0.75rem;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #818cf8, #c084fc, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
+</head>
+<body class="text-white">
+    <div class="container mx-auto px-2 py-2 max-w-7xl">
+        <header class="text-center mb-2">
+            <div class="flex items-center justify-center gap-2 mb-1">
+                <i data-lucide="scan-eye" class="w-6 h-6 text-indigo-400"></i>
+                <h1 class="text-2xl font-bold gradient-text">CodeLens AI</h1>
+            </div>
+            <p class="text-slate-400 text-xs">AI-Powered Code Evaluator</p>
+        </header>
+
+        <div class="glass-card rounded-lg p-2 mb-2 max-w-xl mx-auto">
+            <div class="flex items-center gap-2 mb-1">
+                <i data-lucide="key" class="w-3 h-3 text-indigo-400"></i>
+                <label class="font-semibold text-slate-300 text-xs">Google Gemini API Key</label>
+            </div>
+            <div class="flex gap-1">
+                <input 
+                    type="password" 
+                    id="apiKeyInput" 
+                    placeholder="API key or empty for Demo"
+                    class="flex-1 bg-slate-800/50 border border-slate-700 rounded px-2 py-1 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-indigo-500"
+                >
+                <button 
+                    onclick="saveApiKey()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded text-xs font-medium"
+                >
+                    Save
+                </button>
+                <button 
+                    onclick="clearApiKey()"
+                    class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
+                >
+                    X
+                </button>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-2">
+            <div class="glass-card rounded-lg p-2">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-1">
+                        <i data-lucide="code-2" class="w-4 h-4 text-indigo-400"></i>
+                        <h2 class="text-sm font-semibold">Source Code</h2>
+                    </div>
+                    <div class="flex gap-1">
+                        <button 
+                            onclick="loadDemoCode()"
+                            class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded text-xs"
+                        >
+                            Demo
+                        </button>
+                        <button 
+                            onclick="clearCode()"
+                            class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded text-xs"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="relative bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-1" style="background-color: #0f172a;">
+                    <div class="absolute top-0 left-0 right-0 bg-slate-800 px-2 py-1 flex items-center gap-1 border-b border-slate-700 z-10">
+                        <div class="flex gap-1">
+                            <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                            <div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+                            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                        </div>
+                        <span class="text-xs text-slate-500">code</span>
+                    </div>
+                    <div class="pt-6 flex" style="height: 300px;">
+                        <div id="lineNumbers" class="line-numbers flex-shrink-0 overflow-hidden" style="width: 3rem;"></div>
+                        <textarea 
+                            id="codeInput"
+                            class="code-font flex-1 bg-transparent text-slate-200 p-2 resize-none focus:outline-none text-xs"
+                            placeholder="// Paste your code here..."
+                            spellcheck="false"
+                            style="line-height: 1.25rem; height: 100%;"
+                        ></textarea>
+                    </div>
+                </div>
+                
+                <button 
+                    onclick="evaluateCode()"
+                    class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-2 rounded-lg text-sm font-semibold glow-effect"
+                >
+                    Evaluate Code
+                </button>
+            </div>
+
+            <div class="space-y-2">
+                <div id="overallScoreCard" class="glass-card rounded-lg p-3 text-center hidden">
+                    <div class="relative inline-block">
+                        <svg class="w-20 h-20 score-ring" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="6"/>
+                            <circle 
+                                id="overallScoreCircle"
+                                cx="50" cy="50" r="40" 
+                                fill="none" 
+                                stroke="url(#gradient)" 
+                                stroke-width="6"
+                                stroke-linecap="round"
+                                stroke-dasharray="251"
+                                stroke-dashoffset="251"
+                                class="transition-all duration-1000 ease-out"
+                            />
+                            <defs>
+                                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#818cf8"/>
+                                    <stop offset="50%" stop-color="#c084fc"/>
+                                    <stop offset="100%" stop-color="#f472b6"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span id="overallScoreValue" class="text-2xl font-bold gradient-text">0</span>
+                        </div>
+                    </div>
+                    <h3 class="text-sm font-semibold mt-1 text-slate-300">Overall Score</h3>
+                    <p id="overallFeedback" class="text-xs text-slate-400">Your code evaluation results will appear here</p>
+                </div>
+
+                <div id="scoreCards" class="grid grid-cols-3 gap-2 hidden">
+                    <div class="glass-card rounded-lg p-2 text-center">
+                        <div class="flex items-center justify-center gap-1 mb-1">
+                            <i data-lucide="check-circle" class="w-3 h-3 text-green-400"></i>
+                            <span class="text-xs text-slate-400">Correctness</span>
+                        </div>
+                        <div class="relative inline-block">
+                            <svg class="w-12 h-12 score-ring" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4"/>
+                                <circle 
+                                    id="correctnessCircle"
+                                    cx="50" cy="50" r="35" 
+                                    fill="none" 
+                                    stroke="#22c55e" 
+                                    stroke-width="4"
+                                    stroke-linecap="round"
+                                    stroke-dasharray="220"
+                                    stroke-dashoffset="220"
+                                    class="transition-all duration-1000 ease-out"
+                                />
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="correctnessScore" class="text-sm font-bold text-green-400">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-2 text-center">
+                        <div class="flex items-center justify-center gap-1 mb-1">
+                            <i data-lucide="zap" class="w-3 h-3 text-yellow-400"></i>
+                            <span class="text-xs text-slate-400">Efficiency</span>
+                        </div>
+                        <div class="relative inline-block">
+                            <svg class="w-12 h-12 score-ring" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4"/>
+                                <circle 
+                                    id="efficiencyCircle"
+                                    cx="50" cy="50" r="35" 
+                                    fill="none" 
+                                    stroke="#eab308" 
+                                    stroke-width="4"
+                                    stroke-linecap="round"
+                                    stroke-dasharray="220"
+                                    stroke-dashoffset="220"
+                                    class="transition-all duration-1000 ease-out"
+                                />
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="efficiencyScore" class="text-sm font-bold text-yellow-400">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-2 text-center">
+                        <div class="flex items-center justify-center gap-1 mb-1">
+                            <i data-lucide="book-open" class="w-3 h-3 text-blue-400"></i>
+                            <span class="text-xs text-slate-400">Readability</span>
+                        </div>
+                        <div class="relative inline-block">
+                            <svg class="w-12 h-12 score-ring" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4"/>
+                                <circle 
+                                    id="readabilityCircle"
+                                    cx="50" cy="50" r="35" 
+                                    fill="none" 
+                                    stroke="#3b82f6" 
+                                    stroke-width="4"
+                                    stroke-linecap="round"
+                                    stroke-dasharray="220"
+                                    stroke-dashoffset="220"
+                                    class="transition-all duration-1000 ease-out"
+                                />
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="readabilityScore" class="text-sm font-bold text-blue-400">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="feedbackSection" class="glass-card rounded-lg p-2 hidden" style="background-color: #0f172a;">
+                    <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-1">
+                            <i data-lucide="brain" class="w-4 h-4 text-purple-400"></i>
+                            <h3 class="text-sm font-semibold">AI Feedback</h3>
+                        </div>
+                        <button 
+                            onclick="downloadReport()"
+                            class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded text-xs"
+                        >
+                            Download
+                        </button>
+                    </div>
+                    
+                    <div class="feedback-scroll rounded p-1" style="height: 300px; overflow-y: auto; background-color: #0f172a;">
+                        <div class="bg-slate-800/50 rounded p-1">
+                            <div class="flex items-center gap-1 mb-1">
+                                <i data-lucide="activity" class="w-3 h-3 text-indigo-400"></i>
+                                <span class="text-xs font-medium text-indigo-300">Detected Complexity</span>
+                            </div>
+                            <p id="complexityAnalysis" class="text-xs text-slate-300">-</p>
+                        </div>
+                        
+                        <div class="bg-slate-800/50 rounded p-1">
+                            <div class="flex items-center gap-1 mb-1">
+                                <i data-lucide="lightbulb" class="w-3 h-3 text-yellow-400"></i>
+                                <span class="text-xs font-medium text-yellow-300">Optimization Tips</span>
+                            </div>
+                            <ul id="optimizationTips" class="text-xs text-slate-300 space-y-1">
+                                <li>-</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-slate-800/50 rounded p-1">
+                            <div class="flex items-center gap-1 mb-1">
+                                <i data-lucide="pen-tool" class="w-3 h-3 text-green-400"></i>
+                                <span class="text-xs font-medium text-green-300">Readability Fixes</span>
+                            </div>
+                            <ul id="readabilityFixes" class="text-xs text-slate-300 space-y-1">
+                                <li>-</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-slate-800/50 rounded p-1">
+                            <div class="flex items-center gap-1 mb-1">
+                                <i data-lucide="message-square" class="w-3 h-3 text-pink-400"></i>
+                                <span class="text-xs font-medium text-pink-300">Additional Comments</span>
+                            </div>
+                            <p id="additionalComments" class="text-xs text-slate-300">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="loadingState" class="glass-card rounded-lg p-4 text-center hidden">
+                    <div class="inline-block">
+                        <i data-lucide="loader-2" class="w-6 h-6 text-indigo-400 animate-spin"></i>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Analyzing your code...</p>
+                </div>
+
+                <div id="emptyState" class="glass-card rounded-lg p-4 text-center">
+                    <div class="inline-block p-2 bg-slate-800/50 rounded-full mb-2">
+                        <i data-lucide="file-code-2" class="w-8 h-8 text-slate-600"></i>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-400">Ready to Analyze</h3>
+                    <p class="text-xs text-slate-500 mt-1">Paste code and click Evaluate</p>
+                </div>
+
+                <div id="errorState" class="glass-card rounded-lg p-2 hidden">
+                    <div class="flex items-center gap-2 text-red-400">
+                        <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                        <span class="font-semibold text-xs">Error</span>
+                    </div>
+                    <p id="errorMessage" class="text-xs text-slate-400 mt-1">An error occurred</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center mt-2 text-slate-500 text-xs">
+            <p>CodeLens AI - UnsaidTalks Evaluation Standard</p>
+        </footer>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Safe localStorage access with try-catch
+        let apiKey = '';
+        try {
+            apiKey = localStorage.getItem('gemini_api_key') || '';
+        } catch (e) {
+            console.warn('localStorage not available');
+        }
+        
+        if (apiKey) {
+            document.getElementById('apiKeyInput').value = apiKey;
+        }
+
+        function saveApiKey() {
+            const input = document.getElementById('apiKeyInput');
+            apiKey = input.value.trim();
+            if (apiKey) {
+                try {
+                    localStorage.setItem('gemini_api_key', apiKey);
+                } catch (e) {
+                    console.warn('Could not save to localStorage');
+                }
+                alert('API Key saved!');
+            }
+        }
+
+        function clearApiKey() {
+            apiKey = '';
+            try {
+                localStorage.removeItem('gemini_api_key');
+            } catch (e) {
+                console.warn('Could not remove from localStorage');
+            }
+            document.getElementById('apiKeyInput').value = '';
+        }
+
+        const codeInput = document.getElementById('codeInput');
+        const lineNumbers = document.getElementById('lineNumbers');
+        let currentResult = null;
+
+        function updateLineNumbers() {
+            const lines = codeInput.value.split('\n').length;
+            lineNumbers.innerHTML = '';
+            
+            const textareaLineHeight = '1.25rem';
+            
+            for (let i = 1; i <= Math.max(lines, 20); i++) {
+                const div = document.createElement('div');
+                div.style.height = textareaLineHeight;
+                div.style.lineHeight = textareaLineHeight;
+                div.style.display = 'flex';
+                div.style.alignItems = 'center';
+                div.textContent = i;
+                lineNumbers.appendChild(div);
+            }
+        }
+
+        codeInput.addEventListener('input', function() {
+            updateLineNumbers();
+            lineNumbers.scrollTop = codeInput.scrollTop;
+        });
+        
+        codeInput.addEventListener('scroll', function() {
+            lineNumbers.scrollTop = codeInput.scrollTop;
+        });
+
+        updateLineNumbers();
+
+        const demoCode = "def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr";
+
+        function loadDemoCode() {
+            codeInput.value = demoCode;
+            updateLineNumbers();
+            lineNumbers.scrollTop = 0;
+        }
+
+        function clearCode() {
+            codeInput.value = '';
+            updateLineNumbers();
+            hideResults();
+        }
+
+        function hideResults() {
+            document.getElementById('overallScoreCard').classList.add('hidden');
+            document.getElementById('scoreCards').classList.add('hidden');
+            document.getElementById('feedbackSection').classList.add('hidden');
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('emptyState').classList.remove('hidden');
+            document.getElementById('errorState').classList.add('hidden');
+            currentResult = null;
+        }
+
+        const evaluationPrompt = "Act as an expert code reviewer. Automatically detect the programming language and provide a JSON response with scores (0-100) for Correctness, Efficiency and Readability. Include Detected Complexity (e.g., O(n)) and improvement tips. Follow the UnsaidTalks evaluation standard.\n\nCode to analyze:\n";
+
+        const demoBaseResponse = {
+            correctness: 85,
+            efficiency: 55,
+            readability: 75,
+            complexity: "O(n^2)",
+            complexity_explanation: "The nested loops result in quadratic time complexity O(n^2).",
+            optimization_tips: [
+                "Consider using Python's built-in sorted()",
+                "Implement Quick Sort or Merge Sort",
+                "Use single pass optimization"
+            ],
+            readability_fixes: [
+                "Add docstrings to explain the function",
+                "Use more descriptive variable names",
+                "Add type hints for better code clarity"
+            ],
+            additional_comments: "The implementation is correct but has room for improvement."
+        };
+
+        function getRandomVariation(baseValue, variance) {
+            const variation = Math.floor(Math.random() * (variance * 2 + 1)) - variance;
+            return Math.max(0, Math.min(100, baseValue + variation));
+        }
+
+        function getDemoResponse() {
+            const correctness = getRandomVariation(demoBaseResponse.correctness, 5);
+            const efficiency = getRandomVariation(demoBaseResponse.efficiency, 5);
+            const readability = getRandomVariation(demoBaseResponse.readability, 5);
+            const overall_score = Math.round((correctness + efficiency + readability) / 3);
+            
+            return {
+                overall_score: overall_score,
+                correctness: correctness,
+                efficiency: efficiency,
+                readability: readability,
+                complexity: demoBaseResponse.complexity,
+                complexity_explanation: demoBaseResponse.complexity_explanation,
+                optimization_tips: demoBaseResponse.optimization_tips,
+                readability_fixes: demoBaseResponse.readability_fixes,
+                additional_comments: demoBaseResponse.additional_comments
+            };
+        }
+
+        function showLoading() {
+            hideResults();
+            document.getElementById('loadingState').classList.remove('hidden');
+        }
+
+        function animateScore(circleId, score) {
+            const circle = document.getElementById(circleId);
+            if (!circle) return;
+            
+            const radius = circleId === 'overallScoreCircle' ? 40 : 35;
+            const actualCircumference = 2 * Math.PI * radius;
+            const offset = actualCircumference - (score / 100) * actualCircumference;
+            
+            setTimeout(() => {
+                circle.style.strokeDashoffset = offset;
+            }, 100);
+        }
+
+        function displayResults(data) {
+            currentResult = data;
+            document.getElementById('loadingState').classList.add('hidden');
+            
+            document.getElementById('overallScoreCard').classList.remove('hidden');
+            document.getElementById('overallScoreValue').textContent = data.overall_score;
+            document.getElementById('overallFeedback').textContent = getOverallFeedback(data.overall_score);
+            
+            animateScore('overallScoreCircle', data.overall_score);
+            
+            document.getElementById('scoreCards').classList.remove('hidden');
+            
+            setTimeout(() => {
+                animateScore('correctnessCircle', data.correctness);
+                animateScore('efficiencyCircle', data.efficiency);
+                animateScore('readabilityCircle', data.readability);
+            }, 200);
+            
+            document.getElementById('correctnessScore').textContent = data.correctness;
+            document.getElementById('efficiencyScore').textContent = data.efficiency;
+            document.getElementById('readabilityScore').textContent = data.readability;
+            
+            document.getElementById('feedbackSection').classList.remove('hidden');
+            document.getElementById('complexityAnalysis').innerHTML = '<span class="text-sm font-bold text-indigo-400">' + data.complexity + '</span> ' + data.complexity_explanation;
+            
+            const optimizationList = document.getElementById('optimizationTips');
+            optimizationList.innerHTML = data.optimization_tips.map(tip => '<li class="flex items-start gap-1"><span class="text-yellow-400">-</span>' + tip + '</li>').join('');
+            
+            const readabilityList = document.getElementById('readabilityFixes');
+            readabilityList.innerHTML = data.readability_fixes.map(fix => '<li class="flex items-start gap-1"><span class="text-green-400">-</span>' + fix + '</li>').join('');
+            
+            document.getElementById('additionalComments').textContent = data.additional_comments;
+            
+            lucide.createIcons();
+        }
+
+        function getOverallFeedback(score) {
+            if (score >= 90) return "Excellent! Production-ready code!";
+            if (score >= 75) return "Great work! Minor improvements.";
+            if (score >= 60) return "Good effort! Several areas for improvement.";
+            if (score >= 40) return "Needs work. Focus on efficiency.";
+            return "Requires significant improvements.";
+        }
+
+        function downloadReport() {
+            if (!currentResult) {
+                alert('No results to download.');
+                return;
+            }
+
+            let report = "==========================================\n";
+            report += "    CODE LENS AI - EVALUATION REPORT\n";
+            report += "==========================================\n\n";
+            report += "OVERALL SCORE: " + currentResult.overall_score + "/100\n";
+            report += getOverallFeedback(currentResult.overall_score) + "\n\n";
+            report += "DETAILED SCORES:\n";
+            report += "- Correctness: " + currentResult.correctness + "/100\n";
+            report += "- Efficiency: " + currentResult.efficiency + "/100\n";
+            report += "- Readability: " + currentResult.readability + "/100\n\n";
+            report += "CODE COMPLEXITY: " + currentResult.complexity + "\n";
+            report += currentResult.complexity_explanation + "\n\n";
+            report += "OPTIMIZATION TIPS:\n";
+            currentResult.optimization_tips.forEach(function(tip, i) {
+                report += (i + 1) + ". " + tip + "\n";
+            });
+            report += "\nREADABILITY IMPROVEMENTS:\n";
+            currentResult.readability_fixes.forEach(function(fix, i) {
+                report += (i + 1) + ". " + fix + "\n";
+            });
+            report += "\nADDITIONAL COMMENTS:\n";
+            report += currentResult.additional_comments + "\n\n";
+            report += "==========================================\n";
+            report += "Generated by CodeLens AI\n";
+            report += new Date().toLocaleString() + "\n";
+
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'code-evaluation-report.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorState').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        async function evaluateCode() {
+            const code = codeInput.value.trim();
+            
+            if (!code) {
+                showError('Please enter some code to evaluate');
+                return;
+            }
+
+            if (!apiKey) {
+                console.log('No API key found, using Demo Mode');
+                displayResults(getDemoResponse());
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const fullPrompt = evaluationPrompt + '\n\n' + code;
+
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: fullPrompt
+                            }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 2048,
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || 'API request failed');
+                }
+
+                const data = await response.json();
+                
+                // Check if response has valid structure
+                if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+                    throw new Error('Invalid API response structure');
+                }
+                
+                const responseText = data.candidates[0].content.parts[0].text;
+
+                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('Invalid response format from AI');
+                }
+
+                const result = JSON.parse(jsonMatch[0]);
+
+                if (result.error) {
+                    showError(result.error);
+                    return;
+                }
+
+                const overallScore = Math.round(
+                    (result.correctness + result.efficiency + result.readability) / 3
+                );
+
+                const finalResult = {
+                    overall_score: overallScore,
+                    correctness: result.correctness,
+                    efficiency: result.efficiency,
+                    readability: result.readability,
+                    complexity: result.complexity || "Unknown",
+                    complexity_explanation: result.complexity_explanation || "Could not determine complexity",
+                    optimization_tips: result.optimization_tips || ["No specific tips available"],
+                    readability_fixes: result.readability_fixes || ["No specific fixes available"],
+                    additional_comments: result.additional_comments || "Analysis complete"
+                };
+
+                displayResults(finalResult);
+
+            } catch (error) {
+                console.error('Evaluation error:', error);
+                showError(error.message + '. Using Demo Mode.');
+                setTimeout(() => {
+                    displayResults(getDemoResponse());
+                }, 2000);
+            }
+        }
+
+        codeInput.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                evaluateCode();
+            }
+        });
+    </script>
+</body>
+</html>
